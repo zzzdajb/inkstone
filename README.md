@@ -32,6 +32,12 @@ uv pip install inkstone[pdf,docx]
 
 没有 uv 的环境可以用 pip 替代：`pip install inkstone[pdf,docx]`
 
+### SKILL（Claude Code）
+
+```bash
+npx skills add zzzdajb/inkstone
+```
+
 ### 开发环境
 
 ```bash

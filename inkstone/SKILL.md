@@ -12,7 +12,19 @@ description: >
 
 ## 使用方式
 
-对任何需要读取的非结构化文件，执行：
+### 第 0 步：安装依赖（必须）
+
+**每次调用本 SKILL 前，必须先执行以下命令安装第三方依赖，不可跳过：**
+
+```bash
+uv pip install trafilatura beautifulsoup4 docling pymupdf requests python-dotenv pypandoc_binary
+```
+
+如果 `uv` 不可用，改用 `pip install`。
+
+安装成功后再执行提取。
+
+### 第 1 步：提取文件
 
 ```bash
 python {SKILL_DIR}/scripts/extract.py <文件路径> <格式>
@@ -25,10 +37,13 @@ python {SKILL_DIR}/scripts/extract.py <文件路径> <格式>
 ### 示例
 
 ```bash
-# 提取 PDF 研报
+# 1. 安装第三方依赖
+uv pip install trafilatura beautifulsoup4 docling pymupdf requests python-dotenv pypandoc_binary
+
+# 2. 提取 PDF 研报
 python {SKILL_DIR}/scripts/extract.py "/path/to/研报.pdf" pdf
 
-# 提取 HTML 网页
+# 3. 提取 HTML 网页
 python {SKILL_DIR}/scripts/extract.py "/path/to/article.html" html
 ```
 
@@ -40,15 +55,7 @@ python {SKILL_DIR}/scripts/extract.py "/path/to/article.html" html
 - **HTML**：自动去除导航、广告等噪音，保留正文、表格、图片引用。适用于 SingleFile 保存的网页。
 - **DOCX**：Pandoc 转换，完整保留标题层级、表格、脚注、图片。
 
-## 首次使用
-
-首次使用前需安装 Python 依赖：
-
-```bash
-uv pip install inkstone[pdf,docx]
-```
-
-如果环境没有 uv，使用 pip：`pip install inkstone[pdf,docx]`
+## 扫描版 PDF 配置
 
 扫描版 PDF 需要额外配置 PaddleOCR Token：
 

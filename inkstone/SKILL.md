@@ -12,42 +12,33 @@ description: >
 
 ## 使用方式
 
-### 第 0 步：安装依赖（必须）
-
-**每次调用本 SKILL 前，必须先执行以下命令安装第三方依赖，不可跳过：**
+用 `uv run` 一条命令完成依赖安装和提取，无需手动管理环境：
 
 ```bash
-uv pip install trafilatura beautifulsoup4 docling pymupdf requests python-dotenv pypandoc_binary
+uv run --directory "{SKILL_DIR}/.." python "{SKILL_DIR}/scripts/extract.py" <文件路径>
 ```
 
-如果 `uv` 不可用，改用 `pip install`。
-
-安装成功后再执行提取。
-
-### 第 1 步：提取文件
-
-```bash
-python {SKILL_DIR}/scripts/extract.py <文件路径> <格式>
-```
-
-- `<格式>` 可选值：`html`、`pdf`、`docx`
+- 格式从文件扩展名自动推断（`.pdf`→pdf、`.html`/`.htm`→html、`.docx`→docx）
 - 输出目录与输入文件同级（如 `report.pdf` → `report/report.md` + 图片）
 - 命令输出为输出目录路径
 
 ### 示例
 
 ```bash
-# 1. 安装第三方依赖
-uv pip install trafilatura beautifulsoup4 docling pymupdf requests python-dotenv pypandoc_binary
+# 提取 PDF 研报
+uv run --directory "{SKILL_DIR}/.." python "{SKILL_DIR}/scripts/extract.py" "/path/to/研报.pdf"
 
-# 2. 提取 PDF 研报
-python {SKILL_DIR}/scripts/extract.py "/path/to/研报.pdf" pdf
-
-# 3. 提取 HTML 网页
-python {SKILL_DIR}/scripts/extract.py "/path/to/article.html" html
+# 提取 HTML 网页
+uv run --directory "{SKILL_DIR}/.." python "{SKILL_DIR}/scripts/extract.py" "/path/to/article.html"
 ```
 
 然后读取输出目录中的 `.md` 文件即可。
+
+## 禁止事项
+
+- **不要**直接调用 `python` 或 `.venv/Scripts/python` 或 `.venv/bin/python`，必须通过 `uv run` 执行
+- **不要**手动运行 `pip install`、`uv pip install` 或任何包安装命令
+- **不要**直接读取原始 PDF/HTML/DOCX，总是通过本 SKILL 提取后再读取
 
 ## 支持格式
 
@@ -66,6 +57,5 @@ echo "PADDLE_OCR_TOKEN=<your_token>" > ~/.inkstone/.env
 
 ## 注意事项
 
-- 不要直接读取原始 PDF/HTML，总是通过本 SKILL 提取后再读取
 - 输出固定为 Markdown，所有格式判断在工具内部完成
 - 图片以 `![](path)` 形式保留在 Markdown 中，可直接查看

@@ -13,11 +13,12 @@ dependencies = [
     "trafilatura>=2.0",
     "beautifulsoup4>=4.12",
     "mcp>=2.0",
+    "docling>=2.80",
+    "pymupdf",
+    "requests",
+    "python-dotenv",
+    "pypandoc_binary",
 ]
-
-[project.optional-dependencies]
-pdf = ["docling>=2.80", "pymupdf", "requests", "python-dotenv"]
-docx = ["pypandoc_binary"]
 
 [project.scripts]
 inkstone = "inkstone.core:cli_main"

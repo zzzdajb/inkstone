@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 """Inkstone SKILL script entry point."""
-import os
 import sys
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
 from inkstone.core import extract
 
-if len(sys.argv) != 3:
-    print("Usage: python extract.py <file_path> <format>")
-    print("Formats: html, pdf, docx")
+if len(sys.argv) < 2 or len(sys.argv) > 3:
+    print("Usage: python extract.py <file_path> [format]")
+    print("Format is inferred from extension if omitted. Supported: html, pdf, docx")
     sys.exit(1)
 
-output_dir = extract(sys.argv[1], format=sys.argv[2])
+fmt = sys.argv[2] if len(sys.argv) == 3 else None
+output_dir = extract(sys.argv[1], format=fmt)
 print(output_dir)

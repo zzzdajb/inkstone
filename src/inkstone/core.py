@@ -1,12 +1,26 @@
 import argparse
+import os
 import sys
 
+FORMAT_MAP = {
+    ".html": "html",
+    ".htm": "html",
+    ".pdf": "pdf",
+    ".docx": "docx",
+}
 
-def extract(path: str, format: str) -> str:
+
+def extract(path: str, format: str | None = None) -> str:
     """
     输入文件路径和格式，执行结构化提取。
     返回输出目录的路径。
     """
+    if format is None:
+        ext = os.path.splitext(path)[1].lower()
+        format = FORMAT_MAP.get(ext)
+        if format is None:
+            raise ValueError(f"Cannot infer format from extension: {ext}")
+
     if format == "html":
         from inkstone.html import extract_html
 
@@ -29,7 +43,7 @@ def cli_main():
 
     extract_parser = subparsers.add_parser("extract", help="Extract structured Markdown from a file")
     extract_parser.add_argument("path", help="Input file path")
-    extract_parser.add_argument("--format", required=True, choices=["html", "pdf", "docx"])
+    extract_parser.add_argument("--format", choices=["html", "pdf", "docx"], default=None, help="Inferred from extension if omitted")
 
     args = parser.parse_args()
 

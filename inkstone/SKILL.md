@@ -42,8 +42,9 @@ python {SKILL_DIR}/scripts/extract.py "/path/to/article.html" html
 ## 首次使用
 
 ```bash
-pip install inkstone        # 基础安装（仅 HTML）
-pip install inkstone[pdf]   # 启用 PDF 支持
+uv pip install inkstone        # 基础安装（仅 HTML）
+uv pip install inkstone[pdf]   # 启用 PDF 支持
+# 没有 uv 时用 pip: pip install inkstone[pdf]
 ```
 
 扫描版 PDF 需要配置 PaddleOCR Token：

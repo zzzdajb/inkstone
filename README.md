@@ -18,13 +18,15 @@ Inkstone 是一个面向 AI Agent 生态的文档结构化提取工具。Agent �
 
 ```bash
 # 基础安装（仅 HTML）
-pip install inkstone
+uv pip install inkstone
 
 # 启用 PDF 支持
-pip install inkstone[pdf]
+uv pip install inkstone[pdf]
 ```
 
-开发环境使用 uv：
+没有 uv 的环境可以用 pip 替代：`pip install inkstone[pdf]`
+
+### 开发环境
 
 ```bash
 git clone <repo-url>

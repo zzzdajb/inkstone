@@ -16,7 +16,9 @@ def extract(path: str, format: str) -> str:
 
         return extract_pdf(path)
     elif format == "docx":
-        raise NotImplementedError("DOCX format not yet implemented")
+        from inkstone.docx import extract_docx
+
+        return extract_docx(path)
     else:
         raise ValueError(f"Unsupported format: {format}")
 

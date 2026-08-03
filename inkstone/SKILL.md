@@ -1,14 +1,14 @@
 ---
 name: inkstone
 description: >
-  当需要读取 PDF、HTML 等非结构化文件并转化为结构化 Markdown 时使用。
+  当需要读取 PDF、HTML、DOCX 等非结构化文件并转化为结构化 Markdown 时使用。
   支持金融研报、网页文章、公告等文档类型。PDF 自动区分文字版和扫描版。
   调用 scripts/extract.py 处理，Agent 无需接触原始文件。
 ---
 
 # Inkstone 文档结构化提取
 
-将 PDF、HTML 等非结构化文件转化为 AI 可直接消费的 Markdown + 图片。
+将 PDF、HTML、DOCX 等非结构化文件转化为 AI 可直接消费的 Markdown + 图片。
 
 ## 使用方式
 
@@ -38,16 +38,17 @@ python {SKILL_DIR}/scripts/extract.py "/path/to/article.html" html
 
 - **PDF**：自动区分文字版（Docling 提取）和扫描版（PaddleOCR 云端 OCR）。文字版支持表格结构识别和图片提取。
 - **HTML**：自动去除导航、广告等噪音，保留正文、表格、图片引用。适用于 SingleFile 保存的网页。
+- **DOCX**：Pandoc 转换，完整保留标题层级、表格、脚注、图片。
 
 ## 首次使用
 
 首次使用前需安装 Python 依赖：
 
 ```bash
-uv pip install inkstone[pdf]
+uv pip install inkstone[pdf,docx]
 ```
 
-如果环境没有 uv，使用 pip：`pip install inkstone[pdf]`
+如果环境没有 uv，使用 pip：`pip install inkstone[pdf,docx]`
 
 扫描版 PDF 需要额外配置 PaddleOCR Token：
 

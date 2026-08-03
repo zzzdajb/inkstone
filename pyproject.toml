@@ -17,7 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 pdf = ["docling>=2.80", "pymupdf", "requests", "python-dotenv"]
-docx = ["python-docx>=1.0"]
+docx = ["pypandoc_binary"]
 
 [project.scripts]
 inkstone = "inkstone.core:cli_main"

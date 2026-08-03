@@ -12,7 +12,7 @@ Inkstone 是一个面向 AI Agent 生态的文档结构化提取工具。Agent �
 | HTML | ✅ | BeautifulSoup 预处理 + Trafilatura |
 | PDF（文字版） | ✅ | Docling（TableFormer 表格识别 + 图片提取） |
 | PDF（扫描版） | ✅ | PaddleOCR 云端 API（自动检测，无需手动指定） |
-| DOCX | 🔜 | 占位，暂未实现 |
+| DOCX | ✅ | Pandoc（via pypandoc_binary） |
 
 ## 安装
 
@@ -22,16 +22,22 @@ uv pip install inkstone
 
 # 启用 PDF 支持
 uv pip install inkstone[pdf]
+
+# 启用 DOCX 支持
+uv pip install inkstone[docx]
+
+# 全部格式
+uv pip install inkstone[pdf,docx]
 ```
 
-没有 uv 的环境可以用 pip 替代：`pip install inkstone[pdf]`
+没有 uv 的环境可以用 pip 替代：`pip install inkstone[pdf,docx]`
 
 ### 开发环境
 
 ```bash
 git clone <repo-url>
 cd inkstone
-uv sync --extra pdf
+uv sync --extra pdf --extra docx
 ```
 
 ## 使用
@@ -46,6 +52,9 @@ output_dir = extract("report.html", format="html")
 
 # PDF（自动区分文字版/扫描版）
 output_dir = extract("report.pdf", format="pdf")
+
+# DOCX
+output_dir = extract("report.docx", format="docx")
 ```
 
 输入 `report.pdf` → 输出 `report/` 目录：

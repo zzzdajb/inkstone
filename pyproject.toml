@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "inkstone"
+version = "0.1.0"
+description = "将 HTML/PDF/DOCX 转化为 AI Agent 可消费的结构化 Markdown"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+
+dependencies = [
+    "trafilatura>=2.0",
+    "beautifulsoup4>=4.12",
+    "mcp>=2.0",
+]
+
+[project.optional-dependencies]
+pdf = ["docling>=2.80"]
+ocr = ["paddleocr>=2.8", "paddlepaddle>=2.6"]
+docx = ["python-docx>=1.0"]
+
+[project.scripts]
+inkstone = "inkstone.core:cli_main"
+inkstone-mcp = "inkstone.mcp_server:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

@@ -9,13 +9,14 @@
 
 Inkstone 是一个文档结构化提取工具，面向 AI Agent 生态设计。它解决的核心问题是：Agent 需要读取信源，但原始文档（PDF、DOCX、HTML）充满噪音，直接送入上下文会浪费 token 并干扰理解。
 
-Inkstone 在代码层完成所有判断、路由和清洗，Agent 只需调用一个接口，拿到干净的 Markdown。Agent 永远不碰原始文件。
+Inkstone 在代码层完成所有清洗和提取，Agent 只需调用一个接口，拿到干净的 Markdown + 资源文件。Agent 永远不碰原始文件内容。
 
 **设计原则：**
 
-- Agent 不做判断：所有文件类型检测、扫描版识别、噪音过滤都在代码层完成
-- 统一输出：无论输入什么格式，输出永远是 Markdown
-- 信息零丢失：宁可多保留，不可误删（金融场景优先 recall）
+- Agent 不碰原始文件内容：所有清洗、提取都在代码层完成
+- 统一输出：无论输入什么格式，输出永远是 Markdown + 资源文件
+- 信息零丢失：宁可多保留噪音，不可误删内容（`favor_recall`）
+- 下游 Agent 是多模态模型：Inkstone 不做图片理解，只负责完整提取图片
 - 跨 Agent 可用：同时提供 MCP Server 和 SKILL 两种接入方式
 
 
@@ -26,13 +27,13 @@ Inkstone 在代码层完成所有判断、路由和清洗，Agent 只需调用�
 │                  Core Library                    │
 │              pip install {org}-inkstone           │
 │                                                  │
-│  extract(path) → Markdown                        │
+│  extract(path, format) → output_dir              │
 │                                                  │
 │  ┌───────────┐ ┌───────────┐ ┌────────────────┐ │
 │  │  pdf.py   │ │  docx.py  │ │   html.py      │ │
 │  │  Docling   │ │ python-   │ │  Trafilatura   │ │
-│  │  /Paddle   │ │ docx      │ │                │ │
-│  │  OCR      │ │           │ │                │ │
+│  │  +Paddle  │ │ docx      │ │  +BS4 预处理    │ │
+│  │  OCR API  │ │           │ │                │ │
 │  └───────────┘ └───────────┘ └────────────────┘ │
 │        ▲                                         │
 │  ┌─────┴──────┐                                  │
@@ -53,42 +54,48 @@ Inkstone 在代码层完成所有判断、路由和清洗，Agent 只需调用�
 ### 3.1 统一入口
 
 ```python
-def extract(path: str) -> str:
-    """输入文件路径，返回结构化 Markdown。所有路由在内部完成。"""
-    ext = detect_format(path)
-    if ext == "pdf":
-        return extract_pdf(path)
-    elif ext == "docx":
-        return extract_docx(path)
-    elif ext == "html":
-        return extract_html(path)
-    else:
-        raise UnsupportedFormatError(f"不支持的格式: {ext}")
+def extract(path: str, format: str) -> str:
+    """
+    输入文件路径和格式，执行结构化提取。
+    返回输出目录的路径。
+
+    Args:
+        path: 输入文件的路径
+        format: 文件格式，"html" | "pdf" | "docx"
+
+    Returns:
+        输出目录路径（如 "/path/to/report/"）
+    """
 ```
+
+设计决策：
+- **路由靠调用方传参 `format`**，不做自动检测，不做兜底校验。传错了直接报错，Agent 看到错误会自己修正
+- **返回路径而非内容**：Agent 按需读取，不会被长文档撑爆上下文
+- **输出目录在输入文件同级目录**：输入 `report.html` → 输出 `report/` 文件夹
 
 ### 3.2 PDF 路线
 
 ```
 PDF 输入
   │
-  ├─ detect.py 检测是否有文字层
-  │
-  ├─ 有文字层（文字版 PDF）
-  │    → Docling（do_ocr=False, do_table_structure=True）
-  │    → 输出 Markdown
-  │
-  └─ 无文字层（扫描版 PDF）
-       → PaddleOCR
-       → 输出 Markdown
+  └─ pdf.py extract_pdf(path)
+       │
+       ├─ detect.py is_scanned_pdf(path)  ← PyMuPDF 检测
+       │
+       ├─ 有文字层（文字版 PDF）
+       │    → Docling（do_ocr=False, do_table_structure=True,
+       │              generate_picture_images=True）
+       │    → 输出 Markdown + 图片（Docling 原生格式）
+       │
+       └─ 无文字层（扫描版 PDF）
+            → PaddleOCR 云端 API（PaddleOCR-VL-1.6）
+            → 多页合并为一个 Markdown，<!-- Page N --> 标注页码
+            → 输出 Markdown + 图片（PaddleOCR 原生格式）
 ```
 
-**技术选型理由：**
+**PDF 内部路由对 core.py 透明。** core.py 只调 `pdf.extract_pdf(path)`，不知道 Docling/PaddleOCR 的存在。扫描版/文字版判断、子路由都在 pdf.py 内部完成。
 
-- Docling（IBM，Apache 2.0）：内置 TableFormer 模型，金融表格处理最强；原生文字提取零幻觉；支持 XBRL 金融报告解析；商用无风险
-- PaddleOCR：仅作为扫描版兜底；API 成本极低
-- 关闭 OCR 后 Docling 在 x86 CPU 上约 1-2 秒/页，笔记本可用
-
-**Docling 配置：**
+**文字版 — Docling 配置：**
 
 ```python
 from docling.document_converter import DocumentConverter, PdfFormatOption
@@ -98,6 +105,7 @@ from docling.datamodel.pipeline_options import PdfPipelineOptions
 opts = PdfPipelineOptions(
     do_ocr=False,
     do_table_structure=True,
+    generate_picture_images=True,
 )
 
 converter = DocumentConverter(
@@ -107,24 +115,72 @@ converter = DocumentConverter(
 )
 ```
 
+技术选型理由：
+- Docling（IBM，Apache 2.0）：内置 TableFormer 模型，金融表格处理最强；原生文字提取零幻觉；商用无风险
+- 关闭 OCR 后 Docling 在 x86 CPU 上约 1-2 秒/页，笔记本可用
+- 图片使用 Docling 原生命名和路径，不做后处理重命名
+
+**扫描版 — PaddleOCR 云端 API：**
+
+走百度 PaddleOCR 在线服务（`paddleocr.aistudio-app.com`），不安装本地 PaddlePaddle，只需要 `requests`。
+
+```python
+JOB_URL = "https://paddleocr.aistudio-app.com/api/v2/ocr/jobs"
+MODEL = "PaddleOCR-VL-1.6"
+
+optional_payload = {
+    "useDocOrientationClassify": False,
+    "useDocUnwarping": False,
+    "useChartRecognition": False,
+}
+```
+
+配置说明：
+- `useChartRecognition=False`：图表只作为图片提取，不做结构化识别。符合"不做图片理解，下游 Agent 自己看图"原则
+- `useDocOrientationClassify=False`：输入是 PDF 不是拍照，无需方向检测
+- `useDocUnwarping=False`：PDF 无畸变，无需矫正
+
+API 调用流程：
+1. 提交任务（POST，上传文件或传 URL）
+2. 同步阻塞轮询（GET，`sleep(5)` 间隔）
+3. 超时上限 **5 分钟**，超时抛异常
+4. 获取结果（JSONL 格式，每页一条记录，含 Markdown + 图片 URL）
+5. 多页合并为一个 `.md` 文件，页间用 `<!-- Page N -->` 标注
+6. 下载图片保存到输出目录
+
+**Token 管理：**
+
+- Token 存放位置：`~/.inkstone/.env`（全局生效，配一次即可）
+- 环境变量名：`PADDLE_OCR_TOKEN`
+- 仓库根目录提供 `.env.example` 作为模板
+- Token 缺失时扫描版 PDF 直接报错，不做 fallback
+- 使用 `python-dotenv` 加载 `.env` 文件
+
 ### 3.3 HTML 路线
 
 ```
-HTML 输入
+HTML 输入（SingleFile 本地 HTML）
   │
-  └─ Trafilatura 统一处理
-       参数：include_images=True（保留图片引用，金融图表不可丢）
-             include_tables=True（保留表格）
-             include_links=True（保留链接）
-             favor_recall=True（金融场景宁可多抓）
-             output_format="markdown"
+  ├─ 1. 预处理（BeautifulSoup）
+  │    → 遍历所有 <img> 标签
+  │    → 提取 src 属性中的 base64 图片数据
+  │    → 存为 report/img_001.png, img_002.png ...
+  │    → 将 HTML 中的 base64 src 替换为本地文件名
+  │    → 得到"瘦身 HTML"（从 ~10MB 缩减到几百 KB）
   │
-  └─ 输出 Markdown（含图片引用 ![alt](url)）
+  ├─ 2. Trafilatura 提取正文
+  │    → 参数：include_images=True, include_tables=True,
+  │            include_links=True, favor_recall=True,
+  │            output_format="markdown"
+  │    → 输出: Markdown 字符串
+  │
+  └─ 3. 写入输出目录
+       → report/report.md + report/img_001.png ...
 ```
 
-**说明：** 无需区分"干净 HTML"和"网页型 HTML"。Trafilatura 对两种输入都能正确处理：干净 HTML 近乎原样保留正文；嘈杂网页自动去除导航、广告、脚本等噪音。所有判断在 Trafilatura 内部完成，不依赖 Agent。
+**必须用 BeautifulSoup 解析，不能用正则。** SingleFile HTML 中 `<img>` 标签的 src 属性引号不一致，正则只能匹配部分。
 
-### 3.4 DOCX 路线
+### 3.4 DOCX 路线（占位，暂不实现）
 
 ```
 DOCX 输入
@@ -136,20 +192,24 @@ DOCX 输入
 
 ### 3.5 扫描版检测逻辑（detect.py）
 
+仅用于 PDF 内部的扫描版/文字版判断，不做格式检测（格式由调用方传参）。
+
 ```python
-import pymupdf  # 仅用于检测，不用于提取
+import pymupdf
 
 def is_scanned_pdf(path: str) -> bool:
-    """检查 PDF 是否有可提取文字。在代码层完成，不进 Agent 上下文。"""
+    """检查 PDF 是否有可提取文字。采样前 3 页，任一页 >50 字符即为文字版。"""
     doc = pymupdf.open(path)
-    for page in doc[:3]:  # 采样前 3 页
+    for page in doc[:3]:
         text = page.get_text().strip()
         if len(text) > 50:
             return False
     return True
 ```
 
-**注意：** 此处使用 PyMuPDF 仅做文字层检测（几 ms 级别），不用于实际文本提取。实际提取走 Docling。PyMuPDF 的 AGPL 许可在"仅检测不分发"场景下需评估，或可替换为 pymupdf 的轻量替代（如 pypdf）进行检测。
+- 使用 PyMuPDF（`pymupdf` 包），毫秒级检测
+- 采样前 3 页，任一页提取文字 >50 字符即判定为文字版
+- 仅做检测，不做实际文本提取
 
 
 ## 4. 分发方式
@@ -186,84 +246,74 @@ import:    from inkstone import extract
 }
 ```
 
-### 4.4 SKILL 安装
+### 4.4 SKILL 安装（后续做）
 
 ```bash
 npx skills add {org}/inkstone
 ```
 
-安装后 Claude Code 自动识别。SKILL.md 的 description 控制在 1024 字符内，确保渐进式披露生效。
-
 
 ## 5. MCP Server 设计
 
-### 5.1 暴露的 Tools
+### 5.1 暴露的 Tool
 
-保持最小化，仅 2 个 tool，减少 token 压力：
-
-**Tool 1: `extract`**
+保持最小化，**仅 1 个 tool**：
 
 ```json
 {
   "name": "extract",
-  "description": "将 PDF/DOCX/HTML 文件转化为结构化 Markdown。自动识别文件类型和 PDF 扫描版。",
+  "description": "将 HTML/PDF/DOCX 文件转化为结构化 Markdown。自动提取图片并保存为本地文件。返回输出目录路径。",
   "inputSchema": {
     "type": "object",
     "properties": {
       "path": {
         "type": "string",
         "description": "文件路径"
+      },
+      "format": {
+        "type": "string",
+        "enum": ["html", "pdf", "docx"],
+        "description": "文件格式"
       }
     },
-    "required": ["path"]
+    "required": ["path", "format"]
   }
 }
 ```
 
-**Tool 2: `batch_extract`**
-
-```json
-{
-  "name": "batch_extract",
-  "description": "批量提取多个文件，返回各文件的 Markdown。",
-  "inputSchema": {
-    "type": "object",
-    "properties": {
-      "paths": {
-        "type": "array",
-        "items": { "type": "string" },
-        "description": "文件路径列表"
-      }
-    },
-    "required": ["paths"]
-  }
-}
-```
-
-**设计考量：** 只暴露 2 个 tool，大约 500-800 tokens 的 schema 开销。不暴露 detect_type、extract_pdf 等内部函数——Agent 不需要知道内部路由，这是 Inkstone 的职责。
+设计决策：
+- 只暴露 1 个 tool，不暴露 `detect_type`、`extract_pdf` 等内部函数
+- 不做 `batch_extract`：Agent 需要批量处理时连续调用单个 `extract` 即可
+- `format` 由调用方传参，不做自动检测
 
 ### 5.2 传输方式
 
-优先 stdio（本地进程）。这是受 MCP 2026-07-28 协议更新影响最小的路径，且官方 SDK 内置了新旧协议的自动协商。
+stdio（本地进程）。
 
-### 5.3 实现基础
+### 5.3 实现
 
-使用 MCP Python SDK（官方 Tier 1），已支持 2026-07-28 规范：
+使用 **MCP Python SDK v2**（`mcp >= 2.0`，`MCPServer` 类，2026-07-28 规范）：
 
 ```python
-from mcp.server import Server
+from mcp.server import MCPServer
 
-server = Server("inkstone")
+mcp = MCPServer("inkstone")
 
-@server.tool()
-async def extract(path: str) -> str:
-    """将 PDF/DOCX/HTML 文件转化为结构化 Markdown"""
+@mcp.tool()
+def extract(path: str, format: str) -> str:
+    """将 HTML/PDF/DOCX 文件转化为结构化 Markdown。
+    自动提取图片并保存为本地文件。返回输出目录路径。"""
     from inkstone.core import extract as core_extract
-    return core_extract(path)
+    return core_extract(path, format=format)
+
+def main():
+    mcp.run(transport="stdio")
 ```
 
+注意：MCP SDK v2 将 v1 的 `FastMCP`（`from mcp.server.fastmcp import FastMCP`）改名为 `MCPServer`（`from mcp.server import MCPServer`）。开发环境需安装 `mcp >= 2.0`。
 
-## 6. SKILL 设计
+
+## 6. SKILL 设计（后续做）
 
 ### 6.1 SKILL.md 结构
 
@@ -282,49 +332,23 @@ description: >
 
 对任何需要读取的文件，执行：
 \`\`\`bash
-python {SKILL_DIR}/scripts/extract.py <文件路径> <输出路径>
+python {SKILL_DIR}/scripts/extract.py <文件路径> <格式>
 \`\`\`
 
-输出为 Markdown 文件，可直接读取。
-
-## 支持格式
-
-- PDF（自动区分文字版/扫描版）
-- DOCX
-- HTML（自动去除导航、广告等噪音，保留正文、表格、图片引用）
-
-## 首次使用
-
-\`\`\`bash
-pip install {org}-inkstone
-\`\`\`
-
-## 注意事项
-
-- 不要直接读取原始 PDF/HTML，总是通过本 SKILL 提取后再读取
-- 输出固定为 Markdown，所有格式判断在工具内部完成
-- 金融图表以 ![alt](url) 形式保留在 Markdown 中
+输出为 Markdown 文件 + 图片，可直接读取。
 ```
 
 ### 6.2 scripts/extract.py
 
-SKILL 内的脚本作为 CLI 入口，调用核心库：
-
 ```python
 #!/usr/bin/env python3
-"""Inkstone SKILL 脚本入口。Agent 调用此脚本，代码不进入上下文。"""
 import sys
 from inkstone.core import extract
 
 input_path = sys.argv[1]
-output_path = sys.argv[2]
-
-result = extract(input_path)
-
-with open(output_path, "w", encoding="utf-8") as f:
-    f.write(result)
-
-print(f"提取完成: {output_path}")
+format = sys.argv[2]
+output_dir = extract(input_path, format=format)
+print(f"提取完成: {output_dir}")
 ```
 
 
@@ -333,34 +357,32 @@ print(f"提取完成: {output_path}")
 ```
 {org}/inkstone/
 │
-├── pyproject.toml                      ← Python 包定义
-├── README.md                           ← 安装说明（人读）
+├── pyproject.toml
+├── README.md
 ├── LICENSE                             ← Apache 2.0
+├── .env.example                        ← PADDLE_OCR_TOKEN= 模板
 │
 ├── src/
 │   └── inkstone/
 │       ├── __init__.py                 ← from inkstone import extract
 │       ├── core.py                     ← 统一入口 + 格式路由
-│       ├── pdf.py                      ← Docling 封装
-│       ├── pdf_ocr.py                  ← PaddleOCR 封装（扫描版兜底）
-│       ├── docx.py                     ← python-docx 解析
-│       ├── html.py                     ← Trafilatura 封装
-│       ├── detect.py                   ← 扫描版检测 + 格式检测
+│       ├── html.py                     ← 预处理 + Trafilatura 封装
+│       ├── pdf.py                      ← Docling 封装 + 内部路由（调 detect + pdf_ocr）
+│       ├── pdf_ocr.py                  ← PaddleOCR 云端 API 封装
+│       ├── docx.py                     ← （占位，暂不实现）
+│       ├── detect.py                   ← 扫描版检测（PyMuPDF，仅 PDF 内部使用）
 │       └── mcp_server.py              ← MCP Server 入口
 │
-├── inkstone/                           ← SKILL 目录（npx skills add 识别）
+├── inkstone/                           ← SKILL 目录（后续做）
 │   ├── SKILL.md
 │   └── scripts/
 │       └── extract.py
 │
-├── tests/
-│   ├── test_pdf.py
-│   ├── test_html.py
-│   ├── test_docx.py
-│   └── fixtures/                       ← 测试用文档样本
-│
-└── scripts/
-    └── install.sh                      ← 一键安装脚本（检测环境，配置 MCP + SKILL）
+└── tests/
+    ├── test_html.py
+    ├── test_pdf.py                     ← Docling 文字版真实 fixture 测试
+    └── fixtures/
+        └── *.pdf                       ← 测试用 PDF（gitignore 排除）
 ```
 
 
@@ -370,34 +392,44 @@ print(f"提取完成: {output_path}")
 [project]
 name = "{org}-inkstone"
 version = "0.1.0"
-description = "将 PDF/DOCX/HTML 转化为 AI Agent 可消费的结构化 Markdown"
+description = "将 HTML/PDF/DOCX 转化为 AI Agent 可消费的结构化 Markdown"
 requires-python = ">=3.10"
 license = "Apache-2.0"
 
 dependencies = [
-    "docling>=2.80",
     "trafilatura>=2.0",
-    "python-docx>=1.0",
+    "beautifulsoup4>=4.12",
     "mcp>=2.0",
 ]
 
 [project.optional-dependencies]
-ocr = ["paddleocr>=2.8", "paddlepaddle>=2.6"]
+pdf = ["docling>=2.80", "pymupdf", "requests", "python-dotenv"]
+docx = ["python-docx>=1.0"]
 
 [project.scripts]
 inkstone = "inkstone.core:cli_main"
 inkstone-mcp = "inkstone.mcp_server:main"
 ```
 
-**说明：** PaddleOCR 放在 optional dependencies 中（`pip install {org}-inkstone[ocr]`）。大部分用户处理文字版 PDF 不需要它，避免安装 PaddlePaddle 这个重依赖。
+设计决策：
+- 只用 **uv** 作为包管理器开发
+- PDF 依赖放在 optional-dependencies：Docling（提取）+ PyMuPDF（检测）+ requests（PaddleOCR API）+ python-dotenv（.env 加载）
+- PaddleOCR 走云端 API，不再需要 `paddleocr` 和 `paddlepaddle` 本地依赖
+- 分发走 PyPI
 
 
-## 9. 版本与发布
+## 9. 不做的事情
 
-- 语义化版本：v0.1.0 → v0.2.0（新格式支持）→ v1.0.0（生产稳定）
-- GitHub Release + Tag：`npx skills add` 可锁定版本
-- PyPI 发布：每个 tag 自动触发 CI 发布
-- SKILL 和 MCP Server 同版本号，同仓库，同 tag
+明确排除，避免范围蔓延：
+
+- **不做 URL 输入**：只接受本地文件路径
+- **不做格式自动检测**：靠调用方传 `format` 参数
+- **不做传参校验兜底**：格式传错直接报错
+- **不做图片理解**：下游 Agent 是多模态模型，自己看图
+- **不做 batch 接口**：Agent 需要批量处理时连续调用单个 `extract` 即可
+- **不做缓存**：暂不需要
+- **不做分块输出**：暂不需要
+- **不做 OCR fallback**：Token 缺失时扫描版 PDF 直接报错
 
 
 ## 10. 未来扩展方向
@@ -406,4 +438,3 @@ inkstone-mcp = "inkstone.mcp_server:main"
 - 图片理解：对提取出的图片引用，可选调用多模态模型生成描述
 - 缓存层：相同文件不重复提取，返回缓存结果
 - 分块输出：对超长文档按章节/页码分块输出，适配 RAG 管线
-- XBRL 深度解析：利用 Docling 的 XBRL 能力，结构化提取财务数据

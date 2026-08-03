@@ -12,7 +12,9 @@ def extract(path: str, format: str) -> str:
 
         return extract_html(path)
     elif format == "pdf":
-        raise NotImplementedError("PDF format not yet implemented")
+        from inkstone.pdf import extract_pdf
+
+        return extract_pdf(path)
     elif format == "docx":
         raise NotImplementedError("DOCX format not yet implemented")
     else:

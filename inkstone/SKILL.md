@@ -41,7 +41,13 @@ python {SKILL_DIR}/scripts/extract.py "/path/to/article.html" html
 
 ## 首次使用
 
-Python 依赖会在首次调用时自动安装（优先 uv，fallback pip），无需手动操作。
+首次使用前需安装 Python 依赖：
+
+```bash
+uv pip install inkstone[pdf]
+```
+
+如果环境没有 uv，使用 pip：`pip install inkstone[pdf]`
 
 扫描版 PDF 需要额外配置 PaddleOCR Token：
 

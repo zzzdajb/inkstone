@@ -920,19 +920,13 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
-    { name = "mcp" },
-    { name = "trafilatura" },
-]
-
-[package.optional-dependencies]
-docx = [
-    { name = "pypandoc-binary" },
-]
-pdf = [
     { name = "docling" },
+    { name = "mcp" },
     { name = "pymupdf" },
+    { name = "pypandoc-binary" },
     { name = "python-dotenv" },
     { name = "requests" },
+    { name = "trafilatura" },
 ]
 
 [package.dev-dependencies]
@@ -943,15 +937,14 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.12" },
-    { name = "docling", marker = "extra == 'pdf'", specifier = ">=2.80" },
+    { name = "docling", specifier = ">=2.80" },
     { name = "mcp", specifier = ">=2.0" },
-    { name = "pymupdf", marker = "extra == 'pdf'" },
-    { name = "pypandoc-binary", marker = "extra == 'docx'" },
-    { name = "python-dotenv", marker = "extra == 'pdf'" },
-    { name = "requests", marker = "extra == 'pdf'" },
+    { name = "pymupdf" },
+    { name = "pypandoc-binary" },
+    { name = "python-dotenv" },
+    { name = "requests" },
     { name = "trafilatura", specifier = ">=2.0" },
 ]
-provides-extras = ["pdf", "docx"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=9.1.1" }]

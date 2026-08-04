@@ -7,6 +7,6 @@ build/
 .venv/
 .pytest_cache/
 
-tests/fixtures/*.html
-tests/fixtures/*.pdf
-tests/fixtures/*/
+inkstone/tests/fixtures/*.html
+inkstone/tests/fixtures/*.pdf
+inkstone/tests/fixtures/*/

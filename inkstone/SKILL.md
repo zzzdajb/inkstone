@@ -15,7 +15,7 @@ description: >
 用 `uv run` 一条命令完成依赖安装和提取，无需手动管理环境：
 
 ```bash
-uv run --directory "{SKILL_DIR}/.." python "{SKILL_DIR}/scripts/extract.py" <文件路径>
+uv run --directory "{SKILL_DIR}" python "{SKILL_DIR}/scripts/extract.py" <文件路径>
 ```
 
 - 格式从文件扩展名自动推断（`.pdf`→pdf、`.html`/`.htm`→html、`.docx`→docx）
@@ -26,10 +26,10 @@ uv run --directory "{SKILL_DIR}/.." python "{SKILL_DIR}/scripts/extract.py" <文
 
 ```bash
 # 提取 PDF 研报
-uv run --directory "{SKILL_DIR}/.." python "{SKILL_DIR}/scripts/extract.py" "/path/to/研报.pdf"
+uv run --directory "{SKILL_DIR}" python "{SKILL_DIR}/scripts/extract.py" "/path/to/研报.pdf"
 
 # 提取 HTML 网页
-uv run --directory "{SKILL_DIR}/.." python "{SKILL_DIR}/scripts/extract.py" "/path/to/article.html"
+uv run --directory "{SKILL_DIR}" python "{SKILL_DIR}/scripts/extract.py" "/path/to/article.html"
 ```
 
 然后读取输出目录中的 `.md` 文件即可。

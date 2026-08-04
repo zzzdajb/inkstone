@@ -17,20 +17,8 @@ Inkstone 是一个面向 AI Agent 生态的文档结构化提取工具。Agent �
 ## 安装
 
 ```bash
-# 基础安装（仅 HTML）
 uv pip install inkstone
-
-# 启用 PDF 支持
-uv pip install inkstone[pdf]
-
-# 启用 DOCX 支持
-uv pip install inkstone[docx]
-
-# 全部格式
-uv pip install inkstone[pdf,docx]
 ```
-
-没有 uv 的环境可以用 pip 替代：`pip install inkstone[pdf,docx]`
 
 ### SKILL（Claude Code）
 
@@ -42,8 +30,8 @@ npx skills add zzzdajb/inkstone
 
 ```bash
 git clone <repo-url>
-cd inkstone
-uv sync --extra pdf --extra docx
+cd inkstone/inkstone
+uv sync
 ```
 
 ## 使用
@@ -87,7 +75,8 @@ Inkstone 提供 MCP Server，任何支持 MCP 的 Agent 都可以直接调用：
 {
   "mcpServers": {
     "inkstone": {
-      "command": "inkstone-mcp"
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/inkstone/inkstone", "inkstone-mcp"]
     }
   }
 }
